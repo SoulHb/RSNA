@@ -1,9 +1,8 @@
-import cv2
-import re
 import os
-import pandas as pd
+import re
+import cv2
 from pydicom import dcmread
-from sklearn.model_selection import train_test_split
+import pandas as pd
 
 
 def save_data(folder: str, dataset: pd.DataFrame) -> None:
@@ -17,37 +16,53 @@ def save_data(folder: str, dataset: pd.DataFrame) -> None:
     Returns:
         None
     """
+    # Extracting image paths from the DataFrame
     images_path = dataset['image_path'].tolist()
+
+    # Iterating through each image path
     for img in images_path:
+        # Extracting information for the current image
         image = dataset[dataset['image_path'] == img]
+
+        # List to store YOLO-formatted bounding box information
         yolo_lines = []
+
+        # Extracting bounding box information for the current image
         bboxes = image['bboxes'].tolist()
         for bb in bboxes:
+            # Parsing bounding box information from the string
             b = bb.split(',')
             bboxes_list = [n.split('-') for n in b]
             bboxes_list.pop()
             for bbox in bboxes_list:
+                # Converting bounding box information to YOLO format
                 label = int(bbox[0])
                 x_min = float(bbox[1])
                 y_min = float(bbox[2])
                 w = float(bbox[3])
                 h = float(bbox[4])
-                x_center = ((2*x_min + w)/(2*1024))
-                y_center = ((2*y_min + h)/(2*1024))
+                x_center = ((2 * x_min + w) / (2 * 1024))
+                y_center = ((2 * y_min + h) / (2 * 1024))
 
-                yolo_lines.append([label, x_center, y_center, w/1024, h/1024])
-                # Assuming 'yolo_lines' contains bounding box information in YOLO format
-                match = re.search(r'/([\w-]+)\.dcm$', img)
+                # Appending YOLO-formatted bounding box to the list
+                yolo_lines.append([label, x_center, y_center, w / 1024, h / 1024])
 
-                extracted_string = match.group(1)
-                patient_id = extracted_string
-                with open(os.path.join(folder, "labels", patient_id + ".txt"), "w") as f:
-                    for bbox in yolo_lines:
-                        # Extracting x, y, width, height from YOLO format
-                        label, x_center, y_center, w, h = bbox[0], bbox[1], bbox[2], bbox[3], bbox[4]
-                        f.write(f"{label} {x_center} {y_center} {w} {h}\n")
+        # Extracting patient ID from the image path
+        match = re.search(r'/([\w-]+)\.dcm$', img)
+        extracted_string = match.group(1)
+        patient_id = extracted_string
+
+        # Writing YOLO-formatted bounding box information to a text file
+        with open(os.path.join(folder, "labels", patient_id + ".txt"), "w") as f:
+            for bbox in yolo_lines:
+                label, x_center, y_center, w, h = bbox[0], bbox[1], bbox[2], bbox[3], bbox[4]
+                f.write(f"{label} {x_center} {y_center} {w} {h}\n")
+
+        # Reading DICOM image and converting to RGB format
         img_dcm = dcmread(img)
         img_rgb = cv2.cvtColor(img_dcm.pixel_array, cv2.COLOR_GRAY2RGB)
+
+        # Saving the RGB image to the destination folder
         cv2.imwrite(os.path.join(folder, "images", f"{patient_id}.jpg"), img_rgb)
 
 
