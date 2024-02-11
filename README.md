@@ -38,7 +38,7 @@ conda create --name=rsna python=3.10
 ```
 Activate virtual environment
 ```bash
-conda activate --name=rsna 
+conda activate rsna 
 ```
 Install pip 
 ```bash
