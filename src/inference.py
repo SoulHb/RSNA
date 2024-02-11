@@ -8,59 +8,98 @@ import argparse
 from ultralytics import YOLO
 from config import TEST_DATA_PATH, BEST_MODEL_PATH, SUBMISSION_PATH
 
+from ultralytics import YOLO
+
+import os
+import cv2
+import pydicom
+import numpy as np
+import pandas as pd
+
+
+def resize_bbox(bbox: tuple, scale_factor: float = 0.17) -> tuple:
+    """
+    Resize a bounding box based on a scale factor.
+
+    Args:
+        bbox (tuple): Tuple containing (x1, y1, x2, y2) coordinates of the bounding box.
+        scale_factor (float): Scaling factor for resizing the bounding box.
+
+    Returns:
+        tuple: Resized bounding box coordinates (new_x1, new_y1, new_width, new_height).
+    """
+    # Extract coordinates from the bounding box
+    x1, y1, x2, y2 = bbox
+    # Calculate width and height of the bounding box
+    width = x2 - x1
+    height = y2 - y1
+
+    # Calculate new width and height based on the scale factor
+    new_width = width * (1 - scale_factor)
+    new_height = height * (1 - scale_factor)
+
+    # Calculate new x and y coordinates for the top-left corner of the resized bounding box
+    new_x1 = x1 + (width - new_width) / 2
+    new_y1 = y1 + (height - new_height) / 2
+
+    # Return the coordinates of the resized bounding box
+    return new_x1, new_y1, new_width, new_height
+
 
 def create_submission(model: YOLO, dir_path: str) -> pd.DataFrame:
     """
-    Create a submission DataFrame with patient IDs and corresponding prediction strings.
+    Create a submission DataFrame containing predictions for a given directory of RGB images.
 
     Args:
-        model (YOLO): YOLO model for object detection.
-        dir_path (str): Path to the directory containing DICOM images.
+        model: Object representing the detection model used for predictions.
+        dir_path (str): Path to the directory containing RGB images.
 
     Returns:
-        pd.DataFrame: DataFrame with 'patientId' and 'PredictionString' columns.
+        pd.DataFrame: DataFrame with columns 'patientId' and 'PredictionString'.
+                      'patientId' contains patient IDs, and 'PredictionString' contains
+                      formatted prediction strings for bounding box coordinates and confidence.
     """
-    # Get a list of files in the specified directory and sort them
+    # Get the list of files in the directory and sort them
     file_list = os.listdir(dir_path)
     file_list = sorted(file_list)
-
     # Extract patient IDs from file names
     patient_ids = [file_name.replace(".dcm", "") for file_name in file_list]
-
-    # List to store prediction strings
     results_list = []
 
-    # Loop through each DICOM image in the directory
+    # Iterate through each image in the directory
     for img in file_list:
-        # Read the DICOM image
+        # Construct the full path to the DICOM image
         image_path = os.path.join(dir_path, img)
+        # Read the DICOM image
         dicom_image = pydicom.dcmread(image_path)
+        # Extract pixel array from the DICOM image
         image = dicom_image.pixel_array
+        # Convert grayscale image to BGR format
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
-        # Initialize an empty string to store the prediction string for the image
+        # Initialize an empty string to store predictions for the current image
         img_string = ''
-
-        # Get predictions from the YOLO model for the current image
+        # Get predictions from the model for the current image
         results = model(image)
 
-        # Loop through each prediction in the results
+        # Iterate through each prediction in the results
         for i, result in enumerate(results):
-            # Check if the prediction contains bounding box information
+            # Check if there are any bounding boxes in the current prediction
             if result.boxes.xyxy.numel() != 0:
-                # Extract confidence and bounding box coordinates
+                # Extract confidence score for the bounding box
                 confidence = result.boxes.conf[i].item()
                 confidence = np.around(confidence, 1)
-                x_min, y_min, x_max, y_max = result.boxes.xyxy[i].squeeze(0)
+                # Resize the bounding box coordinates using the resize_bbox function
+                x_min, y_min, width, height = resize_bbox(result.boxes.xyxy[i].squeeze(0))
+                # Append the formatted string to the img_string
+                img_string += f"{confidence} {x_min} {y_min} {width} {height} "
 
-                # Append bounding box information to the image string
-                img_string += f"{confidence} {int(x_min)} {int(y_min)} {int(x_max - x_min)} {int(y_max - y_min)}"
+        # Append the img_string for the current image to the results_list
+        results_list.append(img_string.strip())
 
-        # Append the prediction string for the image to the results list
-        results_list.append(img_string)
-
-    # Create a DataFrame with patient IDs and prediction strings
+    # Create a DataFrame with patient IDs and corresponding prediction strings
     df = pd.DataFrame({'patientId': patient_ids, 'PredictionString': results_list})
+    # Return the DataFrame
     return df
 
 
@@ -79,7 +118,6 @@ def main(args: dict) -> None:
     """
     # Initialize the YOLO model with the specified checkpoint
     model = YOLO(args['best_model_path'] if args['best_model_path'] else BEST_MODEL_PATH)
-
     # Record the start time
     start_time = time.time()
 

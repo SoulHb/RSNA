@@ -12,8 +12,12 @@ The dataset used for training and scoring is loaded with pytorch.
 [Link to the dataset on Kaggle](https://www.kaggle.com/competitions/rsna-pneumonia-detection-challenge/overview)
 ## Model Architecture
 The RSNA Pneumonia Detection Challenge neural network model is built using the YOLOv8n architecture.
+
+## Method
+Train YOLOv8n on 100 epochs and scale bboxes to 0.17 and create submission.csv
+
 ## Score
-After training, the best model achieved 0.09575 on private score and 0.03333 public score.
+After training, the best model achieved 0.11939 on private score and 0.04166 public score.
 ## Usage
 ### Requirements
 
