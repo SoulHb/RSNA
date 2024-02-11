@@ -20,7 +20,7 @@ Train YOLOv8n on 100 epochs and scale bboxes to 0.17 and create submission.csv
 After training, the best model achieved 0.11939 on private score and 0.04166 public score.
 ## Usage
 ### Requirements
-
+- Ubuntu 20.04
 - Python 3.10
 
 ### Getting Started
@@ -32,7 +32,7 @@ Move to project folder
 ```bash
 cd RSNA
 ```
-Create conda env or other virtual environments
+Create conda env 
 ```bash
 conda create --name=rsna python=3.10
 ```
